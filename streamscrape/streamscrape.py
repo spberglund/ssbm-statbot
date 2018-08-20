@@ -12,6 +12,7 @@ import os
 import sys
 import datetime
 from pathos.pools import ThreadPool
+import cv2
 
 ############ Global Parameters ############
 SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -90,6 +91,32 @@ def download_gif(url, savedir, fmt = 'mp4'):
 
     return save_file_from_web(gfyUrl, filePath)
 
+def convert_gif_to_images(gifPath):
+    destDir = gifPath.rsplit('.', 1)[0]
+    if os.path.exists(destDir): return None
+    os.mkdir(destDir)
+
+    print('converting {} to images'.format(os.path.basename(gifPath)))
+
+    vidcap = cv2.VideoCapture(gifPath)
+
+    success, image = vidcap.read()
+    count = 0
+    success = True
+    while success:
+        cv2.imwrite(os.path.join(destDir, "frame_{:06d}.jpg".format(count)), image)     # save frame as JPEG file
+        success, image = vidcap.read()
+        count += 1
+
+    print('generated {} images from {}'.format(count, os.path.basename(gifPath)))
+
+    return destDir
+
+def download_gif_and_convert_to_images(url, savedir, fmt = 'mp4'):
+    gifPath = download_gif(url, savedir, fmt)
+    if not gifPath: return None
+
+    return convert_gif_to_images(gifPath)
 
 def download_top_melee_gifs(pages = 1):
     print('Looking for gifs on the top {} reddit pages'.format(pages))
@@ -97,13 +124,13 @@ def download_top_melee_gifs(pages = 1):
     saveDir = create_timestamped_dir()
     print('Will save to {}'.format(saveDir))
 
-    urls = get_melee_gif_urls(pages);
+    urls = get_melee_gif_urls(pages)
     print('Found {} gif urls'.format(len(urls)))
 
-    pool = ThreadPool(25)
-    results = pool.map(lambda url:download_gif(url, saveDir), urls)
+    pool = ThreadPool(50)
+    results = pool.map(lambda url:download_gif_and_convert_to_images(url, saveDir), urls)
 
-    print('Done downloading {} gifs'.format(len(filter(None, results))))
+    print('Done downloading and converting {} gifs'.format(len(filter(None, results))))
 
 if __name__ == '__main__':
     numPages = 1 #default number of pages to load
